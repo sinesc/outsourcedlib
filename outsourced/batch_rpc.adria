@@ -1,0 +1,484 @@
+/**
+ * BatchRPC
+ *
+ * High-performance binary procedure call serializer suitable for use with
+ * zero-copy buffer-exchange provided by SHM
+ *
+ * BatchRPC subclasses need to be initialized once by
+ * SubClass::initChannel() in order to compile optimized serializers
+ * for the procedures defined in SubClass::procedures.
+ */
+module BatchRPC = proto {
+
+    /**
+     * array of procedures supported by the command channel
+     * required implementation
+     */
+    procedures: null,
+
+    /**
+     * size of the channel in integers (32 bit)
+     */
+    size: 32 * 1024,
+
+    /**
+     * write- and read-functions created by initChannel
+     */
+    writeChannel: null,
+    readChannel: null,
+
+    /**
+     * target instance to use for method call if no handler is defined in BatchRPC subclass
+     */
+    targetInstance: null,
+
+    /**
+     * parameter types
+     */
+    P_FLOAT : 91,
+    P_INT : 92,
+    P_STR : 93,
+
+    /**
+     * internal: int/float32 arrays on storage buffer
+     */
+    _idata: null,
+    _fdata: null,
+
+    /**
+     * internal: current read/write position in channel
+     */
+    _position: 1,
+
+    /**
+     * internal: command->id and id->command maps
+     */
+    _cmdToId: null,
+    _idToCmd: null,
+
+    /**
+     * instance constructor
+     *
+     * @param object targetInstance optional instance to run procedures on
+     */
+    public constructor: func(Object? targetInstance = null) {
+
+        assert(this._cmdToId instanceof Object, 'end-point setup required before instances can be constructed');
+        assert(this._idToCmd instanceof Object, 'end-point setup required before instances can be constructed');
+        assert(this.writeChannel instanceof Object, 'end-point setup required before instances can be constructed');
+        assert(this.readChannel instanceof Object, 'end-point setup required before instances can be constructed');
+
+        this.targetInstance = targetInstance;
+    },
+
+    /**
+     * initialize command channel endpoint. must be called on the prototype
+     *
+     * @param string endPointName name of the local end-point (where procedures of this endpoint-type are called to be executed on the other endpoint)
+     * @param boolean createWrapper create read/write wrapper functions on this prototype
+     */
+    public setupEndPoint: func(string endPointName, boolean createWrapper = true) {
+
+        assert(this.prototype === undefined, 'must be called on a prototype');
+
+        var id, name;
+
+        this._cmdToId = { };
+        this._idToCmd = { };
+        this.writeChannel = { };
+        this.readChannel = { };
+
+        for (var index in this.procedures) {
+
+            var command = this.procedures[index];
+
+            assert(command instanceof Array);
+            assert(command[0] === null || typeof command[0] === 'string');
+            assert(typeof command[1] === 'string');
+            assert(typeof command[2] === 'string');
+
+            // build command<->id maps
+
+            id = parseInt(index) +1;
+            name = (command[0] !== null ? command[0] + '$' : '') + command[1];
+
+            this._cmdToId[name] = id;
+            this._idToCmd[id] = name;
+
+            // compile procedure-specific read/write functions
+
+            if (command[2] === endPointName) {
+                createWriter(this, command[0], command[1], command.slice(3), createWrapper);
+            } else {
+                createReader(this, command[0], command[1], command.slice(3), createWrapper);
+            }
+        }
+    },
+
+    /**
+     * run all procedures in given buffer and reset it
+     *
+     * @param ArrayBuffer buffer
+     * @param integer byteOffset
+     */
+    public executeBuffer: func(ArrayBuffer buffer, finite byteOffset = 0) {
+
+        var idata = this.setBuffer(buffer, byteOffset);
+        var readChannel = this.readChannel;
+        //var target = this.targetInstance; // !todo targetInstance might be changed by channelfunctions, remove parameter, have gen. code use this.targetInstance
+        var idToCmd = this._idToCmd;
+        var length = this.length;
+        var cmdId;
+
+        assert(length >= 0);
+
+        // perform all procedures in channel
+
+        for (var i = 0; i < length; ++i) {
+            cmdId = idata[this._position++];
+            readChannel[idToCmd[cmdId]](this, this.targetInstance);
+        }
+
+        // reset channel command count to 0
+
+        idata[0] = 0;
+    },
+
+    /**
+     * skip all procedures in given buffer and reset it
+     *
+     * @param ArrayBuffer buffer
+     * @param integer byteOffset
+     */
+    public skipBuffer: func(ArrayBuffer buffer, byteOffset) {
+
+        var idata = this.setBuffer(buffer, byteOffset);
+        idata[0] = 0;
+    },
+
+    /**
+     * associates a buffer with the BatchRPC
+     *
+     * @param ArrayBuffer buffer
+     * @param integer byteOffset offset in bytes into the buffer
+     */
+    public setBuffer: func(ArrayBuffer buffer, finite byteOffset = 0) {
+
+        this._idata = new Int32Array(buffer, byteOffset, this.size * 4);
+        this._fdata = new Float32Array(buffer, byteOffset, this.size * 4);
+        this._position = 1;
+
+        if (typeof this.initBuffer === 'function') {
+            this.initBuffer();
+        }
+
+        return this._idata;
+    },
+
+    /**
+     * returns the required size for a buffer to host this channel
+     */
+    public requiredBufferSize: prop {
+        get: func() {
+            return this.size * 4;
+        }
+    },
+
+    /**
+     * sets or returns current number of procedures stored in the channel
+     */
+    public length: prop {
+        get: func() {
+            assert(this._idata instanceof Int32Array);
+            return this._idata[0];
+        },
+        set: func(value) {
+            assert(this._idata instanceof Int32Array);
+            this._idata[0] = value;
+        }
+    },
+
+};
+
+/**
+ * checks whether given type of parameter is used in parameterlist
+ *
+ * @param test parameter type to look for
+ * @param args parameterlist
+ * @return bool
+ */
+var uses = func(test, args) {
+
+    for (var index in args) {
+
+        if (args[index] === test) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+/**
+ * private: creates a function used to write a specific command to the channel
+ *
+ * @param name function name
+ * @param args function argument type array
+ * @param createWrapper if true and it doesn't already exist, a basic wrapper function is created in the BatchRPC, calling the created function
+ */
+var createWriter = func(channel, instanceName, name, args, createWrapper) {
+
+    var varDefs = [];
+    var writerArgs = '';
+
+    // compose function arguments
+
+    if (instanceName !== null) {
+        writerArgs += ', instanceId';
+    }
+
+    for (var index = 0; index < args.length; index++) {
+        writerArgs += ', arg' + index;
+    }
+
+    // prefix instanced functions
+
+    if (instanceName !== null) {
+        name = instanceName + '$' + name;
+    }
+
+    // function body
+
+    var source = '(function(channel' + writerArgs;
+    source += ') {\n';
+
+    // localize some fields
+
+    varDefs.push('_idata = channel._idata');
+
+    if (uses(channel.P_FLOAT, args)) {
+        varDefs.push('_fdata = channel._fdata');
+    }
+
+    varDefs.push('_position = channel._position');
+
+    source += '    var ' + varDefs.join(',\n        ') + ';\n\n';
+
+    // command and instance id
+
+    source += '    _idata[_position++] = ' + channel._cmdToId[name] + ',\n';
+
+    // write strings first
+
+    for (var index = 0; index < args.length; index++) {
+
+        if (args[index] === channel.P_STR) {
+            source += '    _position = writeString(channel, _position, arg' + index + '),\n';
+        }
+    }
+
+    // write instance id
+
+    if (instanceName !== null) {
+        source += '    _idata[_position++] = instanceId,\n';
+    }
+
+    // write other types
+
+    for (var index = 0; index < args.length; index++) {
+
+        if (args[index] === channel.P_INT) {
+            source += '    _idata[_position++] = arg' + index + ',\n';
+        } else if (args[index] === channel.P_FLOAT) {
+            source += '    _fdata[_position++] = arg' + index + ',\n';
+        }
+    }
+
+    source += '\n    channel._position = _position,';
+    source += '\n    ++_idata[0];';
+    source += '\n});';
+    source += '\n//@ sourceURL=http://localhost/writer/' + channel.constructor.name + '/' + name + '.js';
+
+    channel.writeChannel[name] = eval(source);
+
+    // optionally also create wrapper function
+
+    if (createWrapper && instanceName === null && (name in channel) === false) {
+
+        source = '(function(';
+
+        for (var index = 0; index < args.length; index++) {
+            if (index > 0) {
+                source += ', arg' + index;
+            } else {
+                source += 'arg' + index;
+            }
+        }
+
+        source += ') {\n';
+        source += 'this.writeChannel.' + name + '(this' + writerArgs + ');\n';
+        source += '});';
+
+        channel[name] = eval(source);
+    }
+};
+
+/**
+ * private: creates a function used to read a specific command from the channel
+ *
+ * @param name function name
+ * @param args function argument type array
+ */
+var createReader = func(channel, instanceName, name, args, createWrapper) {
+
+    var offset = 0;
+    var varDefs = [ ];
+    var localPosition = false;
+    var directTargetCall = (createWrapper && (name in channel) === false);
+    var source = '(function readChannel$' + name + '(channel' + (directTargetCall ? ', target' : '') + ') {\n';
+
+    // only introduce local _f/_idata if floats/ints are used
+
+    if (uses(channel.P_INT, args) || instanceName !== null) {
+        varDefs.push('_idata = channel._idata');
+        localPosition = true;
+    }
+
+    if (uses(channel.P_FLOAT, args)) {
+        varDefs.push('_fdata = channel._fdata');
+        localPosition = true;
+    }
+
+    // read strings
+
+    for (var index = 0; index < args.length; index++) {
+        if (args[index] === channel.P_STR) {
+            varDefs.push('str' + index + ' = readString(channel)');
+        }
+    }
+
+    // channel position after reading strings
+
+    if (localPosition) {
+        varDefs.push('_position = channel._position');
+    }
+
+    // read instance id (if any)
+
+    if (instanceName !== null) {
+        varDefs.push('instanceId = _idata[' + (localPosition ? '' : 'channel.') + '_position++]');
+    }
+
+    // concat var defs
+
+    if (varDefs.length > 0) {
+        source += '    var ' + varDefs.join(',\n        ') + ';\n';
+    }
+
+    source += '\n';
+
+    // for instanced calls, add instance id parameter and prefix command with instanceName
+
+    if (instanceName === null) {
+        if (directTargetCall) {
+            source += '    // direct mode, calling ' + channel.constructor.name + ':' + ':targetInstance.' + name + '()\n\n';
+            source += '    target.' + name + '(\n';
+        } else {
+            source += '    // wrapper mode, calling ' + channel.constructor.name + '.' + name + '()\n\n';
+            source += '    channel.' + name + '(\n';
+        }
+    } else {
+        source += '    // instanced mode, calling ' + channel.constructor.name + ':' + ':' + instanceName + '[<instanceId>].' + name + '()\n\n';
+        source += '    channel.' + instanceName + '[instanceId].' + name + '(\n';
+    }
+
+    // read other parameters, also handle read strings
+
+    for (var index = 0; index < args.length; index++) {
+
+        assert([ channel.P_INT, channel.P_FLOAT, channel.P_STR ].indexOf(args[index]) > -1);
+
+        if (args[index] === channel.P_INT) {
+            source += '      _idata[' + (offset > 0 ? '++' : '') + '_position]';
+            offset++;
+        } else if (args[index] === channel.P_FLOAT) {
+            source += '      _fdata[' + (offset > 0 ? '++' : '') + '_position]';
+            offset++;
+        } else if (args[index] === channel.P_STR) {
+            source += '      str' + index;
+        }
+
+        if (index < args.length -1) {
+            source += ',\n';
+        }
+    }
+
+    // prefix readchannel function name with instanceName
+
+    name = (instanceName !== null ? instanceName + '$' : '') + name;
+
+    source += '\n    );\n';
+
+    if (offset > 0 || instanceName !== null) {
+        source += '\n    channel._position = ' + (offset > 0 ? '++' : '') + '_position;\n';
+    }
+
+    source += '});';
+    source += '\n//@ sourceURL=http://localhost/reader/' + channel.constructor.name + '/' + name + '.js';
+
+    channel.readChannel[name] = eval(source);
+};
+
+/**
+ * private: writes a string to the buffer and advances current position behind string
+ *
+ * @param String str string to write
+ * @param integer pos write position
+ * @return integer new channel position
+ */
+var writeString = func(channel, pos, str) {
+
+    var strLen = str.length;
+    //var pos = channel._position;
+    var _idata = channel._idata;
+
+    // save length as first value
+
+    _idata[pos++] = strLen;
+
+    // copy string to buffer
+
+    for (var i = 0; i < strLen; i++) {
+        _idata[pos++] = str.charCodeAt(i);
+    }
+
+    //channel._position = pos;
+    return pos;
+};
+
+/**
+ * private: reads a string from the buffer and advances current position behind string
+ *
+ * @return String read string
+ */
+var readString = func(channel) {
+
+    var pos = channel._position;
+    var _idata = channel._idata;
+
+    // first value read is the string length
+
+    var strLen = _idata[pos++];
+
+    // copy buffer to string
+
+    var chars = [];
+
+    for (var i = 0; i < strLen; i++) {
+        chars.push(_idata[pos++]);
+    }
+
+    channel._position = pos;
+
+    return String.fromCharCode.apply(null, chars);
+};

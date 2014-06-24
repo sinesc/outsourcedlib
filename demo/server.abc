@@ -1,0 +1,26 @@
+{
+	"debug": false,
+	"mode": "adria",
+	"stdin": false,
+	"cache": true,
+	"files": [
+		"demo/server.adria"
+	],
+	"outFile": "demo/server.js",
+	"basePath": "../",
+	"paths": [ "../astdlib/" ],
+	"extension": ".adria",
+	"platform": "node",
+	"headerFile": "LICENSE",
+	"defines": {},
+	"shellwrap": true,
+	"shellargs": "",
+	"monitor": false,
+	"strict": true,
+	"es5": false,
+	"assert": true,
+	"scan": true,
+	"map": false,
+	"link": true,
+	"time": false
+}

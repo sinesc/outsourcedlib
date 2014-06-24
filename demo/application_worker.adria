@@ -1,0 +1,19 @@
+
+var BufferExchange = require('outsourced/buffer_exchange');
+var DRPCWorker = require('./includes/drpc_worker');
+
+var bex = new BufferExchange(window);
+var drpc = new DRPCWorker();
+
+bex.on('data', func(buffer, sourceId) {
+
+    drpc.executeBuffer(buffer.data);
+    buffer.release();
+
+    var writeBuffer = bex.getWriteBuffer();
+
+    drpc.setBuffer(writeBuffer.data);
+    drpc.result(drpc.tmp);
+
+    bex.ready();
+});

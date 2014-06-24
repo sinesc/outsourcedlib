@@ -1,0 +1,26 @@
+{
+	"debug": false,
+	"mode": "adria",
+	"stdin": false,
+	"cache": true,
+	"files": [
+		"demo/application_main.adria"
+	],
+	"outFile": "www/application_main.js",
+	"basePath": "../",
+	"paths": [ "../astdlib/", "./" ],
+	"extension": ".adria",
+	"platform": "web",
+	"headerFile": "LICENSE",
+	"defines": {},
+	"shellwrap": false,
+	"shellargs": "",
+	"monitor": true,
+	"strict": true,
+	"es5": false,
+	"assert": true,
+	"scan": true,
+	"map": false,
+	"link": true,
+	"time": false
+}

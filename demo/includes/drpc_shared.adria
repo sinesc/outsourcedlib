@@ -1,0 +1,14 @@
+
+var BatchRPC = require('outsourced/batch_rpc');
+
+/**
+ * the shared part of the demo-rpc BatchRPC
+ */
+
+module DRPCShared = proto (BatchRPC) {
+
+    procedures: [
+        [ null, 'add', 'main', BatchRPC::P_INT, BatchRPC::P_INT ],
+        [ null, 'result', 'worker', BatchRPC::P_INT ],
+    ],
+};

@@ -1,0 +1,79 @@
+
+module Buffer = proto {
+
+    protected exchange: null,
+    protected haveBuffer: true,
+    protected writable: true,
+
+    public data: null,
+
+    public constructor: func(Object exchange, finite? buffersize = null) {
+
+        this.exchange = exchange;
+        this.haveBuffer = buffersize !== null;
+        this.writable = this.haveBuffer;
+        this.data = this.haveBuffer ? new ArrayBuffer(buffersize) : null;
+    },
+
+    public canSend: prop {
+        get: func() {
+            return this.haveBuffer && this.writable === false;
+        }
+    },
+
+    public canReceive: prop {
+        get: func() {
+            return this.haveBuffer === false && this.writable === false;
+        }
+    },
+
+    public canWrite: prop {
+        get: func() {
+            return this.haveBuffer && this.writable;
+        }
+    },
+
+    public release: func() {
+
+        if (this.haveBuffer !== true) {
+            throw new Exception('Buffer does not hold data, cannot release.');
+        }
+
+        if (this.writable !== true) {
+            throw new Exception('Buffer has already been released.');
+        }
+
+        this.writable = false;
+    },
+
+    public send: func(finite sourceId) {
+
+        if (this.haveBuffer !== true) {
+            throw new Exception('Buffer does not hold data, cannot send.');
+        }
+
+        if (this.writable === true) {
+            throw new Exception('Buffer has not been released.');
+        }
+
+        this.exchange.send(this.data, sourceId);
+        this.haveBuffer = false;
+
+        return sourceId;
+    },
+
+    public receive: func(ArrayBuffer data) {
+
+        if (this.haveBuffer) {
+            throw new Exception('Buffer already holds data, cannot receive.');
+        }
+
+        if (this.writable === true) {
+            throw new Exception('Buffer has not been released.');
+        }
+
+        this.data = data;
+        this.haveBuffer = true;
+        this.writable = true;
+    },
+};

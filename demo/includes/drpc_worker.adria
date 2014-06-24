@@ -1,0 +1,17 @@
+
+var DRPCShared = require('./drpc_shared');
+
+/**
+ * the worker's side of the demo-rpc BatchRPC
+ */
+
+module DRPCWorker = proto (DRPCShared) {
+
+    tmp: NaN,
+
+    add: func(finite a, finite b) {
+        this.tmp = a + b;
+    },
+};
+
+DRPCWorker::setupEndPoint('worker');

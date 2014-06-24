@@ -1,0 +1,15 @@
+
+var DRPCShared = require('./drpc_shared');
+
+/**
+ * the main application's side of the demo-rpc BatchRPC
+ */
+
+module DRPCMain = proto (DRPCShared) {
+
+    result: func(tmp) {
+        console.log(tmp);
+    },
+};
+
+DRPCMain::setupEndPoint('main');

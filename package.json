@@ -1,0 +1,43 @@
+{
+  "name": "outsourcedlib",
+  "version": "0.1.1",
+  "description": "Webworker Communication Library",
+  "files": [
+    "outsourced/",
+    "www/",
+    "build.abc",
+    "license-header",
+    "README.md"
+  ],
+  "main": "./www/outsourced.js",
+  "bin": {
+  },
+  "directories": {
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:sinesc/outsourced.git"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {
+    "adria": "0.3.x",
+    "astdlib": "0.1.x"
+  },
+  "engines": {
+  },
+  "keywords": [
+    "webworker",
+    "serializer",
+    "rpc"
+  ],
+  "preferGlobal": false,
+  "author": "Dennis Möhlmann",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sinesc/outsourced/issues"
+  }
+}
