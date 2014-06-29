@@ -8,7 +8,8 @@ var BatchRPC = require('outsourced/batch_rpc');
 module DRPCShared = proto (BatchRPC) {
 
     procedures: [
-        [ null, 'add', 'main', BatchRPC::P_INT, BatchRPC::P_INT ],
-        [ null, 'result', 'worker', BatchRPC::P_INT ],
+        [ 'add', [ BatchRPC::P_INT, BatchRPC::P_INT ] ],
+        [ 'done', [] ],
+        [ 'result', [ BatchRPC::P_INT ] ],
     ],
 };

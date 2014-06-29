@@ -7,11 +7,16 @@ var DRPCShared = require('./drpc_shared');
 
 module DRPCWorker = proto (DRPCShared) {
 
-    tmp: NaN,
+    tmp: 0,
 
     add: func(finite a, finite b) {
-        this.tmp = a + b;
+        this.tmp += (a + b);
     },
+
+    done: func() {
+        this.result(this.tmp);
+        this.tmp = 0;
+    }
 };
 
 DRPCWorker::setupEndPoint('worker');

@@ -36,11 +36,6 @@ module BufferExchange = proto (Listenable) {
     protected numSlotsAvailable: 0,
 
     /**
-     * @var integer current buffer target to write to
-     */
-    protected writeBuffer: 0,
-
-    /**
      * @var func bound receive function
      */
     private receiveHandler: null,
@@ -52,7 +47,7 @@ module BufferExchange = proto (Listenable) {
      * @param integer buffersize
      * @param integer numBuffers number of buffers
      */
-    public constructor: func(object other, finite buffersize = 1024 * 1024, finite numBuffers = 2) {
+    public constructor: func(object other, finite buffersize = 1024 * 1024, finite numBuffers = 4) {
 
         this.other = other;
         this.instanceId = bexInstanceId++;
@@ -61,17 +56,18 @@ module BufferExchange = proto (Listenable) {
         // buffers are on one side of the channel at the same time
 
         this.buffers = new Array(numBuffers * 2);
-        this.bufferStates = new Array(numBuffers * 2);
         this.numSlotsAvailable = numBuffers;
 
         // create local buffers, flag non-locals as busy
 
         for (var i = 0; i < numBuffers; i++) {
-            this.buffers[i] = new Buffer(this, buffersize);
-            this.buffers[i + numBuffers] = new Buffer(this, null);
+            this.buffers[i] = new Buffer(buffersize);
+            this.buffers[i].on('outgoing', this, this.onBufferOutgoing);
+            this.buffers[i + numBuffers] = new Buffer(null);
+            this.buffers[i + numBuffers].on('outgoing', this, this.onBufferOutgoing);
         }
 
-        this.receiveHandler = this.receive.bind(this);
+        this.receiveHandler = this.onMessageReceived.bind(this);
         this.other.addEventListener('message', this.receiveHandler, false);
     },
 
@@ -87,41 +83,92 @@ module BufferExchange = proto (Listenable) {
      */
     public getWriteBuffer: func() {
 
-        if (this.writeBuffer < 0) {
-            return null;
+        var numSlots = this.buffers.length;
+
+        for (var i = 0; i < numSlots; i++) {
+            var buffer = this.buffers[i];
+
+            if (buffer.state === Buffer::STATE_AVAILABLE) {
+                buffer.setReserved();
+                return buffer;
+            }
         }
 
-        return this.buffers[this.writeBuffer];
+        return null;
     },
 
     /**
-     * call when current writebuffer can be sent
+     * attempt to immediately send outgoing buffers
      *
-     * @return finite buffer id
+     * @param Buffer buffer
      */
-    public ready: func() {
-
-        var bufferId = this.writeBuffer;
-        var buffer = this.buffers[bufferId];
-
-        buffer.release();
+    public onBufferOutgoing: func(Buffer buffer) {
 
         // check number of slots available on remote before sending
 
-        if (this.buffers.length - this.numSlotsAvailable > 1) {
-            buffer.send(bufferId);
+        if (this.buffers.length - this.numSlotsAvailable >= 1) {
+            this.send(buffer);
         }
-
-        this.updateWriteSlot();
-        return bufferId;
     },
 
     /**
-     * message receiver
+     * invoked when a valid buffer was received
+     *
+     * @param ArrayBuffer data
+     */
+    protected onDataReceived: func(ArrayBuffer data) {
+
+        var numSlots = this.buffers.length;
+        var freeSlot = -1;
+
+        // flush potentially lingering outgoing buffer and find slot to place the data in
+
+        for (var i = 0; i < numSlots; i++) {
+            var buffer = this.buffers[i];
+
+            if (buffer.state === Buffer::STATE_NOT_AVAILABLE) {
+                freeSlot = i;
+            } else if (buffer.state === Buffer::STATE_OUTGOING) {
+                this.send(buffer);
+                freeSlot = i;
+            }
+        }
+
+        // store received data to buffer
+
+        if (freeSlot > -1) {
+            this.buffers[freeSlot].setReceived(data);
+            this.numSlotsAvailable--;
+            this.execute('data', this.buffers[freeSlot], data);
+        } else {
+            throw new Exception('Excess buffer received.');
+        }
+    },
+
+    /**
+     * sends the buffer to the receiving worker
+     */
+    protected send: func(Buffer buffer) {
+
+        var data = buffer.setSent();
+
+        var container = {
+            bexIdentifier   : bexIdentifier,
+            bexInstance     : this.instanceId,
+            bexBuffer       : data,
+            bexSourceId     : 0, //!todo
+        };
+
+        this.other.postMessage(container, [ container.bexBuffer ]);
+        this.numSlotsAvailable++;
+    },
+
+    /**
+     * message receiver, validates message is a BufferExchange message and invokes onDataReceived
      *
      * @param event postMessage event
      */
-    protected receive: func(event) {
+    public onMessageReceived: func(event) {
 
         var data = event.data;
 
@@ -131,55 +178,6 @@ module BufferExchange = proto (Listenable) {
             return;
         }
 
-        // find slot to place the data in
-
-        var numSlots = this.buffers.length;
-
-        for (var i = 0; i < numSlots; i++) {
-            if (this.buffers[i].canReceive) {
-
-                this.buffers[i].receive(data.bexBuffer);
-                this.numSlotsAvailable--;
-                this.execute('data', this.buffers[i], data.bexSourceId);
-                return;
-            }
-        }
-
-        throw new Exception('Excess buffer received.');
-    },
-
-    /**
-     * finds a buffer slot ready for writing
-     *
-     * @return integer
-     */
-    protected updateWriteSlot: func() {
-
-        var numSlots = this.buffers.length;
-
-        for (var i = 0; i < numSlots; i++) {
-            if (this.buffers[i].canWrite) {
-                this.writeBuffer = i;
-                return;
-            }
-        }
-
-        this.writeBuffer = -1;
-    },
-
-    /**
-     * sends the buffer to the receiving worker
-     */
-    public send: func(ArrayBuffer data, finite sourceId) {
-
-        var container = {
-            bexIdentifier   : bexIdentifier,
-            bexInstance     : this.instanceId,
-            bexBuffer       : data,
-            bexSourceId     : sourceId,
-        };
-
-        this.other.postMessage(container, [ container.bexBuffer ]);
-        this.numSlotsAvailable++;
+        this.onDataReceived(data.bexBuffer);
     },
 };

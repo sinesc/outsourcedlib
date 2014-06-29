@@ -1,79 +1,97 @@
 
-module Buffer = proto {
+var Listenable = require('astd/listenable');
 
-    protected exchange: null,
-    protected haveBuffer: true,
-    protected writable: true,
+/**
+ * Buffer
+ *
+ * @event release(Buffer buffer) emitted on buffer release
+ */
+module Buffer = proto (Listenable) {
+
+    /*
+     * ... -> received -> available* -> reserved -> outgoing -> not-available -> ...
+     *              release()   setReserved() release()   setSent()       setReceived()
+     */
+    public STATE_RECEIVED: 15,
+    public STATE_AVAILABLE: 16,
+    public STATE_RESERVED: 17,
+    public STATE_OUTGOING: 18,
+    public STATE_NOT_AVAILABLE: 19,
 
     public data: null,
 
-    public constructor: func(Object exchange, finite? buffersize = null) {
-
-        this.exchange = exchange;
-        this.haveBuffer = buffersize !== null;
-        this.writable = this.haveBuffer;
-        this.data = this.haveBuffer ? new ArrayBuffer(buffersize) : null;
-    },
-
-    public canSend: prop {
+    public state: prop {
         get: func() {
-            return this.haveBuffer && this.writable === false;
+            return storage;
+        },
+        set: func(value) {      //!todo prot
+            storage = value;
         }
     },
 
-    public canReceive: prop {
-        get: func() {
-            return this.haveBuffer === false && this.writable === false;
-        }
+    public constructor: func(finite? buffersize = null) {
+        this.state = buffersize === null ? this.STATE_NOT_AVAILABLE : this.STATE_AVAILABLE;
+        this.data = buffersize === null ? null : new ArrayBuffer(buffersize);
     },
 
-    public canWrite: prop {
-        get: func() {
-            return this.haveBuffer && this.writable;
-        }
-    },
-
+    /**
+     * release buffer. a received buffer will become available for writing, a reserved buffer will
+     * be marked as outgoing
+     */
     public release: func() {
 
-        if (this.haveBuffer !== true) {
-            throw new Exception('Buffer does not hold data, cannot release.');
+        if (this.state === this.STATE_RECEIVED) {
+
+            this.state = this.STATE_AVAILABLE;
+            this.execute('available', this);
+            return;
+
+        } else if (this.state === this.STATE_RESERVED) {
+
+            this.state = this.STATE_OUTGOING;
+            this.execute('outgoing', this);
+            return;
         }
 
-        if (this.writable !== true) {
-            throw new Exception('Buffer has already been released.');
-        }
-
-        this.writable = false;
+        throw new Exception('Cannot release buffer in its current state');
     },
 
-    public send: func(finite sourceId) {
+    /**
+     * marks buffer as reserved and returns internal ArrayBuffer
+     */
+    public setReserved: func() {
 
-        if (this.haveBuffer !== true) {
-            throw new Exception('Buffer does not hold data, cannot send.');
+        if (this.state !== this.STATE_AVAILABLE) {
+            throw new Exception('Cannot reserve buffer in its current state');
         }
 
-        if (this.writable === true) {
-            throw new Exception('Buffer has not been released.');
-        }
-
-        this.exchange.send(this.data, sourceId);
-        this.haveBuffer = false;
-
-        return sourceId;
+        this.state = this.STATE_RESERVED;
+        return this.data;
     },
 
-    public receive: func(ArrayBuffer data) {
+    /**
+     * marks buffer as sent and returns internal ArrayBuffer
+     */
+    public setSent: func() {
 
-        if (this.haveBuffer) {
-            throw new Exception('Buffer already holds data, cannot receive.');
+        if (this.state !== this.STATE_OUTGOING) {
+            throw new Exception('Cannot send buffer in its current state');
         }
 
-        if (this.writable === true) {
-            throw new Exception('Buffer has not been released.');
+        this.state = this.STATE_NOT_AVAILABLE;
+        return this.data;
+    },
+
+    /**
+     * marks buffer as sent and returns internal ArrayBuffer
+     */
+    public setReceived: func(ArrayBuffer data) {
+
+        if (this.state !== this.STATE_NOT_AVAILABLE) {
+            throw new Exception('Cannot receive buffer in current state');
         }
 
+        this.state = this.STATE_RECEIVED;
         this.data = data;
-        this.haveBuffer = true;
-        this.writable = true;
     },
 };

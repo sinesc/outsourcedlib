@@ -9,19 +9,31 @@ var drpc = new DRPCMain();
 
 setTimeout(func() {
 
-    var buffer = bex.getWriteBuffer();
+    var writeBuffer = bex.getWriteBuffer();
 
-    drpc.setBuffer(buffer.data);
-    drpc.add(12, 11);
+    drpc.writeBuffer(writeBuffer.data);
 
-    bex.ready();
+    for (var i = 0; i < 1000; i++) {
+        drpc.add(12, 11);
+    }
+    drpc.done();
+
+    writeBuffer.release();
 
 }, 500);
 
 
-bex.on('data', func(buffer, sourceId) {
+bex.on('data', func(readBuffer, sourceId) {
+    var writeBuffer = bex.getWriteBuffer();
 
-    drpc.executeBuffer(buffer.data);
-    buffer.release();
+    drpc.writeBuffer(writeBuffer.data);
 
+    for (var i = 0; i < 1000; i++) {
+        drpc.add(12, 11);
+    }
+    drpc.done();
+
+    drpc.readBuffer(readBuffer.data);
+    readBuffer.release();
+    writeBuffer.release();
 });
