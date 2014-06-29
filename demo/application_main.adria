@@ -35,5 +35,5 @@ bex.on('data', func(readBuffer, sourceId) {
 
     drpc.readBuffer(readBuffer.data);
     readBuffer.release();
-    writeBuffer.release();
+    //writeBuffer.release();
 });

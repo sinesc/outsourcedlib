@@ -29,7 +29,7 @@ var path = require('path');
 // server configuration
 
 var listenPort = 80;
-var documentRoot = '../www/';
+var documentRoot = './www/';
 var monitoredFiles = [ './application_main.abc', './application_worker.abc' ];
 
 var contentTypes = {

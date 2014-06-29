@@ -6,7 +6,7 @@
 	"files": [
 		"demo/application_main.adria"
 	],
-	"outFile": "www/application_main.js",
+	"outFile": "demo/www/application_main.js",
 	"basePath": "../",
 	"paths": [ "../astdlib/", "./" ],
 	"extension": ".adria",
