@@ -305,7 +305,7 @@ var createWriter = func(BatchRPC channel, string? instanceName, string name, Arr
     for (var index = 0; index < args.length; index++) {
 
         if (args[index] === channel.P_STR) {
-            source += '    writePosition = writeString(channel, writePosition, arg' + index + '),\n';
+            source += '    writePosition = writeString(channel, writePosition, String(arg' + index + ')),\n';
         }
     }
 
@@ -518,3 +518,6 @@ var readString = func(channel) {
 
     return String.fromCharCode.apply(null, chars);
 };
+
+//!todo suppress "not used" notice
+readString && writeString;

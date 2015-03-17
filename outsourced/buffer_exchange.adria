@@ -24,7 +24,6 @@ var Listenable = require('astd/listenable');
 var Buffer = require('./buffer');
 
 var bexIdentifier = 2504718562;
-var bexInstanceId = 0;
 
 /**
  * BufferExchange
@@ -65,13 +64,14 @@ module BufferExchange = proto (Listenable) {
      * construct new instance
      *
      * @param object other worker to use as other endpoint
+     * @param integer instanceId
      * @param integer buffersize
      * @param integer numBuffers number of buffers
      */
-    public constructor: func(object other, finite buffersize = 1024 * 1024, finite numBuffers = 4) {
+    public constructor: func(object other, finite instanceId = 0, finite buffersize = 1024 * 1024, finite numBuffers = 4) {
 
         this.other = other;
-        this.instanceId = bexInstanceId++;
+        this.instanceId = instanceId;
 
         // reserve space for twice as many buffers to be able to handle situations where all
         // buffers are on one side of the channel at the same time
@@ -177,7 +177,6 @@ module BufferExchange = proto (Listenable) {
             bexIdentifier   : bexIdentifier,
             bexInstance     : this.instanceId,
             bexBuffer       : data,
-            bexSourceId     : 0, //!todo
         };
 
         this.other.postMessage(container, [ container.bexBuffer ]);
@@ -190,8 +189,12 @@ module BufferExchange = proto (Listenable) {
      * @param event postMessage event
      */
     public onMessageReceived: func(event) {
-
+    
         var data = event.data;
+
+        if (this.instanceId === 0 && isFinite(data.bexInstance)) {
+            this.instanceId = data.bexInstance;
+        }
 
         // verify the message is actually a buffer exchange
 
