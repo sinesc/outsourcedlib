@@ -250,6 +250,20 @@ var uses = func(test, args) {
 };
 
 /**
+ * return sourceURL string
+ * oddly, at least in chrome, this requires a hostname to show up along with sourcemapped files (which don't require a hostname)
+ *
+ * @param string root folder
+ * @param Function constructor used for subfolder name
+ * @param string name used for file name
+ */
+var getSourceUrl = func(root, constructor, name) {
+
+    var baseUri = typeof location === 'object' && typeof location.origin === 'string' ? location.origin : 'http://localhost';
+    return '//# sourceURL=' + baseUri + '/rpc/' + root + '/' + constructor.name + '/' + name + '.js';
+};
+
+/**
  * private: creates a function used to write a specific command to the channel
  *
  * @param BatchRPC channel
@@ -329,7 +343,7 @@ var createWriter = func(BatchRPC channel, string? instanceName, string name, Arr
     source += '\n    channel.writePosition = writePosition,';
     source += '\n    ++iWriteArray[0];';
     source += '\n});';
-    source += '\n//@ sourceURL=http://localhost/writer/' + channel.constructor.name + '/' + name + '.js';
+    source += '\n' + getSourceUrl('writer', channel.constructor, name);
 
     channel.writeChannel[name] = eval(source);
 
@@ -350,6 +364,7 @@ var createWriter = func(BatchRPC channel, string? instanceName, string name, Arr
         source += ') {\n';
         source += 'this.writeChannel.' + name + '(this' + writerArgs + ');\n';
         source += '});';
+        source += '\n' + getSourceUrl('wrapper', channel.constructor, name);
 
         channel[name] = eval(source);
     }
@@ -460,7 +475,7 @@ var createReader = func(BatchRPC channel, string? instanceName, string name, Arr
     }
 
     source += '});';
-    source += '\n//@ sourceURL=http://localhost/reader/' + channel.constructor.name + '/' + name + '.js';
+    source += '\n' + getSourceUrl('reader', channel.constructor, name);
 
     channel.readChannel[nameId] = eval(source);
 };
