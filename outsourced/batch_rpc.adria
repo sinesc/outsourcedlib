@@ -108,7 +108,7 @@ module BatchRPC = proto {
      */
     public setupEndPoint: func(string endPointName, boolean createWrapper = true) {
 
-        assert(this.prototype === undefined, 'must be called on a prototype');
+        assert(this.prototype == undefined, 'must be called on a prototype');
 
         var id, name;
 
@@ -125,21 +125,21 @@ module BatchRPC = proto {
             command[ENDPOINT] = command.length < 4 ? null : command[ENDPOINT];
 
             assert(command instanceof Array);
-            assert(typeof command[NAME] === 'string');
+            assert(typeof command[NAME] == 'string');
             assert(command[ARGS] instanceof Array);
-            assert(command[INSTANCE] === null || typeof command[INSTANCE] === 'string');
-            assert(command[ENDPOINT] === null || typeof command[ENDPOINT] === 'string');
+            assert(command[INSTANCE] == null || typeof command[INSTANCE] == 'string');
+            assert(command[ENDPOINT] == null || typeof command[ENDPOINT] == 'string');
 
             // build command<->id maps
 
             id = parseInt(index) +1;
-            name = (command[INSTANCE] !== null ? command[INSTANCE] + '$' : '') + command[NAME];
+            name = (command[INSTANCE] != null ? command[INSTANCE] + '$' : '') + command[NAME];
 
             this._cmdToId[name] = id;
 
             // compile procedure-specific read/write functions
 
-            if ((command[INSTANCE] === null && this[command[NAME]] === undefined) || command[ENDPOINT] === endPointName) {
+            if ((command[INSTANCE] == null && this[command[NAME]] == undefined) || command[ENDPOINT] == endPointName) {
                 createWriter(this, command[INSTANCE], command[NAME], command[ARGS], createWrapper);
             } else {
                 createReader(this, command[INSTANCE], command[NAME], command[ARGS], createWrapper, id);
@@ -241,7 +241,7 @@ var uses = func(test, args) {
 
     for (var index in args) {
 
-        if (args[index] === test) {
+        if (args[index] == test) {
             return true;
         }
     }
@@ -259,7 +259,7 @@ var uses = func(test, args) {
  */
 var getSourceUrl = func(root, constructor, name) {
 
-    var baseUri = typeof location === 'object' && typeof location.origin === 'string' ? location.origin : 'http://localhost';
+    var baseUri = typeof location == 'object' && typeof location.origin == 'string' ? location.origin : 'http://localhost';
     return '//# sourceURL=' + baseUri + '/rpc/' + root + '/' + constructor.name + '/' + name + '.js';
 };
 
@@ -279,7 +279,7 @@ var createWriter = func(BatchRPC channel, string? instanceName, string name, Arr
 
     // compose function arguments
 
-    if (instanceName !== null) {
+    if (instanceName != null) {
         writerArgs += ', instanceId';
     }
 
@@ -289,7 +289,7 @@ var createWriter = func(BatchRPC channel, string? instanceName, string name, Arr
 
     // prefix instanced functions
 
-    if (instanceName !== null) {
+    if (instanceName != null) {
         name = instanceName + '$' + name;
     }
 
@@ -318,14 +318,14 @@ var createWriter = func(BatchRPC channel, string? instanceName, string name, Arr
 
     for (var index = 0; index < args.length; index++) {
 
-        if (args[index] === channel.P_STR) {
+        if (args[index] == channel.P_STR) {
             source += '    writePosition = writeString(channel, writePosition, String(arg' + index + ')),\n';
         }
     }
 
     // write instance id
 
-    if (instanceName !== null) {
+    if (instanceName != null) {
         source += '    iWriteArray[writePosition++] = instanceId,\n';
     }
 
@@ -333,9 +333,9 @@ var createWriter = func(BatchRPC channel, string? instanceName, string name, Arr
 
     for (var index = 0; index < args.length; index++) {
 
-        if (args[index] === channel.P_INT) {
+        if (args[index] == channel.P_INT) {
             source += '    iWriteArray[writePosition++] = arg' + index + ',\n';
-        } else if (args[index] === channel.P_FLOAT) {
+        } else if (args[index] == channel.P_FLOAT) {
             source += '    fWriteArray[writePosition++] = arg' + index + ',\n';
         }
     }
@@ -349,7 +349,7 @@ var createWriter = func(BatchRPC channel, string? instanceName, string name, Arr
 
     // optionally also create wrapper function
 
-    if (createWrapper && instanceName === null && (name in channel) === false) {
+    if (createWrapper && instanceName == null && (name in channel) == false) {
 
         source = '(function(';
 
@@ -385,12 +385,12 @@ var createReader = func(BatchRPC channel, string? instanceName, string name, Arr
     var offset = 0;
     var varDefs = [ ];
     var localPosition = false;
-    var directTargetCall = (createWrapper && (name in channel) === false);
+    var directTargetCall = (createWrapper && (name in channel) == false);
     var source = '(function readChannel$' + name + '(channel' + (directTargetCall ? ', target' : '') + ') {\n';
 
     // only introduce local _f/iReadArray if floats/ints are used
 
-    if (uses(channel.P_INT, args) || instanceName !== null) {
+    if (uses(channel.P_INT, args) || instanceName != null) {
         varDefs.push('iReadArray = channel.iReadArray');
         localPosition = true;
     }
@@ -403,7 +403,7 @@ var createReader = func(BatchRPC channel, string? instanceName, string name, Arr
     // read strings
 
     for (var index = 0; index < args.length; index++) {
-        if (args[index] === channel.P_STR) {
+        if (args[index] == channel.P_STR) {
             varDefs.push('str' + index + ' = readString(channel)');
         }
     }
@@ -416,7 +416,7 @@ var createReader = func(BatchRPC channel, string? instanceName, string name, Arr
 
     // read instance id (if any)
 
-    if (instanceName !== null) {
+    if (instanceName != null) {
         varDefs.push('instanceId = iReadArray[' + (localPosition ? '' : 'channel.') + 'readPosition++]');
     }
 
@@ -430,7 +430,7 @@ var createReader = func(BatchRPC channel, string? instanceName, string name, Arr
 
     // for instanced calls, add instance id parameter and prefix command with instanceName
 
-    if (instanceName === null) {
+    if (instanceName == null) {
         if (directTargetCall) {
             source += '    // direct mode, calling ' + channel.constructor.name + '::targetInstance.' + name + '()\n\n';
             source += '    target.' + name + '(\n';
@@ -449,13 +449,13 @@ var createReader = func(BatchRPC channel, string? instanceName, string name, Arr
 
         assert([ channel.P_INT, channel.P_FLOAT, channel.P_STR ].indexOf(args[index]) > -1);
 
-        if (args[index] === channel.P_INT) {
+        if (args[index] == channel.P_INT) {
             source += '      iReadArray[' + (offset > 0 ? '++' : '') + 'readPosition]';
             offset++;
-        } else if (args[index] === channel.P_FLOAT) {
+        } else if (args[index] == channel.P_FLOAT) {
             source += '      fReadArray[' + (offset > 0 ? '++' : '') + 'readPosition]';
             offset++;
-        } else if (args[index] === channel.P_STR) {
+        } else if (args[index] == channel.P_STR) {
             source += '      str' + index;
         }
 
@@ -466,11 +466,11 @@ var createReader = func(BatchRPC channel, string? instanceName, string name, Arr
 
     // prefix readchannel function name with instanceName
 
-    name = (instanceName !== null ? instanceName + '$' : '') + name;
+    name = (instanceName != null ? instanceName + '$' : '') + name;
 
     source += '\n    );\n';
 
-    if (offset > 0 || instanceName !== null) {
+    if (offset > 0 || instanceName != null) {
         source += '\n    channel.readPosition = ' + (offset > 0 ? '++' : '') + 'readPosition;\n';
     }
 

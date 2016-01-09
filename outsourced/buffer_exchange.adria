@@ -109,7 +109,7 @@ module BufferExchange = proto (Listenable) {
         for (var i = 0; i < numSlots; i++) {
             var buffer = this.buffers[i];
 
-            if (buffer.state === Buffer::STATE_AVAILABLE) {
+            if (buffer.state == Buffer::STATE_AVAILABLE) {
                 buffer.setReserved();
                 return buffer;
             }
@@ -147,9 +147,9 @@ module BufferExchange = proto (Listenable) {
         for (var i = 0; i < numSlots; i++) {
             var buffer = this.buffers[i];
 
-            if (buffer.state === Buffer::STATE_NOT_AVAILABLE) {
+            if (buffer.state == Buffer::STATE_NOT_AVAILABLE) {
                 freeSlot = i;
-            } else if (buffer.state === Buffer::STATE_OUTGOING) {
+            } else if (buffer.state == Buffer::STATE_OUTGOING) {
                 this.send(buffer);
                 freeSlot = i;
             }
@@ -192,13 +192,13 @@ module BufferExchange = proto (Listenable) {
     
         var data = event.data;
 
-        if (this.instanceId === 0 && isFinite(data.bexInstance)) {
+        if (this.instanceId == 0 && isFinite(data.bexInstance)) {
             this.instanceId = data.bexInstance;
         }
 
         // verify the message is actually a buffer exchange
 
-        if (data instanceof Object !== true || data.bexInstance !== this.instanceId || data.bexIdentifier !== bexIdentifier) {
+        if (data instanceof Object != true || data.bexInstance != this.instanceId || data.bexIdentifier != bexIdentifier) {
             return;
         }
 

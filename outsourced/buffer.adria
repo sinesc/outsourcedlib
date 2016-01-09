@@ -51,8 +51,8 @@ module Buffer = proto (Listenable) {
     },
 
     public constructor: func(finite? buffersize = null) {
-        this.state = buffersize === null ? this.STATE_NOT_AVAILABLE : this.STATE_AVAILABLE;
-        this.data = buffersize === null ? null : new ArrayBuffer(buffersize);
+        this.state = buffersize == null ? this.STATE_NOT_AVAILABLE : this.STATE_AVAILABLE;
+        this.data = buffersize == null ? null : new ArrayBuffer(buffersize);
     },
 
     /**
@@ -61,13 +61,13 @@ module Buffer = proto (Listenable) {
      */
     public release: func() {
 
-        if (this.state === this.STATE_RECEIVED) {
+        if (this.state == this.STATE_RECEIVED) {
 
             this.state = this.STATE_AVAILABLE;
             this.execute('available', this);
             return;
 
-        } else if (this.state === this.STATE_RESERVED) {
+        } else if (this.state == this.STATE_RESERVED) {
 
             this.state = this.STATE_OUTGOING;
             this.execute('outgoing', this);
@@ -82,7 +82,7 @@ module Buffer = proto (Listenable) {
      */
     public setReserved: func() {
 
-        if (this.state !== this.STATE_AVAILABLE) {
+        if (this.state != this.STATE_AVAILABLE) {
             throw new Exception('Cannot reserve buffer in its current state');
         }
 
@@ -95,7 +95,7 @@ module Buffer = proto (Listenable) {
      */
     public setSent: func() {
 
-        if (this.state !== this.STATE_OUTGOING) {
+        if (this.state != this.STATE_OUTGOING) {
             throw new Exception('Cannot send buffer in its current state');
         }
 
@@ -108,7 +108,7 @@ module Buffer = proto (Listenable) {
      */
     public setReceived: func(ArrayBuffer data) {
 
-        if (this.state !== this.STATE_NOT_AVAILABLE) {
+        if (this.state != this.STATE_NOT_AVAILABLE) {
             throw new Exception('Cannot receive buffer in current state');
         }
 
